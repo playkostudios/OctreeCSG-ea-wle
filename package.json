@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "eslint . --ext .ts",
     "clean": "rimraf lib/*.js lib/*.map lib/*.ts",
-    "build": "rimraf lib/*.js lib/*.map && esbuild src/index.ts --sourcemap --bundle --minify --platform=neutral --external:gl-matrix:octreecsg-ea --outfile=lib/OctreeCSG-ea-wle.esm.min.js",
+    "build": "rimraf lib/*.js lib/*.map && esbuild src/index.ts --sourcemap --bundle --minify --platform=neutral --external:gl-matrix --external:octreecsg-ea --external:@wonderlandengine/api --outfile=lib/OctreeCSG-ea-wle.esm.min.js",
     "gen-types": "npm-dts generate --entry index.ts --output lib/index.d.ts -L debug",
     "prepack": "npm run clean && npm run gen-types && npm run build"
   },
@@ -44,6 +44,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.40.0",
     "@typescript-eslint/parser": "^5.40.0",
+    "@wonderlandengine/api": "^0.9.0",
     "esbuild": "^0.15.10",
     "eslint": "^8.25.0",
     "gl-matrix": "^3.4.3",
@@ -52,7 +53,6 @@
     "rimraf": "^3.0.2"
   },
   "peerDependencies": {
-    "gl-matrix": "3.x",
-    "octreecsg-ea": "0.x"
+    "gl-matrix": "3.x"
   }
 }
