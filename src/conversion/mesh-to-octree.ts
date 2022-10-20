@@ -4,12 +4,9 @@
 import { OctreeCSG } from 'octreecsg-ea';
 import wleAddMeshToOctreeCSG from './add-mesh-to-octree';
 
-import type { MaterialMeshAttributeMap } from './MaterialMeshAttributeMap';
-import type { MaterialAttributes } from 'octreecsg-ea/base/MaterialDefinition';
+import type { MaterialAttributes } from 'octreecsg-ea';
 
-export default function wleMeshToOctreeCSG(mesh: WL.Mesh, materialIndex?: number): [octree: OctreeCSG, propertyMap: MaterialMeshAttributeMap, materialDefinition: MaterialAttributes] {
+export default function wleMeshToOctreeCSG(mesh: WL.Mesh, materialIndex?: number): [octree: OctreeCSG, attributes: MaterialAttributes] {
     const octree = new OctreeCSG();
-    const [vertexPropertyMap, materialDefinition] = wleAddMeshToOctreeCSG(octree, mesh, materialIndex);
-
-    return [octree, vertexPropertyMap, materialDefinition];
+    return [octree, wleAddMeshToOctreeCSG(octree, mesh, materialIndex)];
 }

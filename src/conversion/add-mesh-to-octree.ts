@@ -2,20 +2,18 @@
 /// <reference path="../../types/globals.d.ts" />
 
 import { vec2, vec3, vec4 } from 'gl-matrix';
-import { Polygon, Vertex } from 'octreecsg-ea';
-import { MaterialAttributeType, MaterialAttributeTransform } from 'octreecsg-ea';
+import { MaterialAttributeStandardType, Polygon, Vertex, MaterialAttributeValueType, MaterialAttributeTransform } from 'octreecsg-ea';
 
-import type { MaterialMeshAttributeMap } from './MaterialMeshAttributeMap';
 import type { OctreeCSG, MaterialAttribute, MaterialAttributes } from 'octreecsg-ea';
 
-type AttributesList = Array<[accessor: WL.MeshAttributeAccessor, vecFactory: () => Array<number> | Float32Array]> | null;
+type AttributeAccessors = Array<[accessor: WL.MeshAttributeAccessor, vecFactory: () => Array<number> | Float32Array]> | null;
 
-function makeVertex(index: number, posAccessor: WL.MeshAttributeAccessor, attributes: AttributesList): Vertex {
+function makeVertex(index: number, posAccessor: WL.MeshAttributeAccessor, attributeAccessors: AttributeAccessors): Vertex {
     let extra = undefined;
-    if (attributes) {
+    if (attributeAccessors) {
         extra = [];
 
-        for (const [accessor, vecFactory] of attributes) {
+        for (const [accessor, vecFactory] of attributeAccessors) {
             extra.push(accessor.get(index, vecFactory()) as vec3);
         }
     }
@@ -23,7 +21,7 @@ function makeVertex(index: number, posAccessor: WL.MeshAttributeAccessor, attrib
     return new Vertex(posAccessor.get(index, vec3.create()) as vec3, extra);
 }
 
-export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, materialIndex?: number): [propertyMap: MaterialMeshAttributeMap, materialDefinition: MaterialAttributes] {
+export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, materialIndex?: number): MaterialAttributes {
     // validate vertex count
     const indexData = mesh.indexData;
     const vertexCount = indexData === null ? mesh.vertexCount : indexData.length;
@@ -35,16 +33,15 @@ export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, 
     // prepare accessors
     // TODO joint vertex attributes
     const positions = mesh.attribute(WL.MeshAttribute.Position);
-    let attributes: AttributesList = [];
-    const materialDefinition = [];
-    let vertexPropertyMap: MaterialMeshAttributeMap = new Map();
+    let attributeAccessors: AttributeAccessors = [];
+    const attributes = [];
 
     const tangents = mesh.attribute(WL.MeshAttribute.Tangent);
     if (tangents) {
-        vertexPropertyMap.set(attributes.length, WL.MeshAttribute.Tangent);
-        attributes.push([tangents, () => vec4.create()]);
-        materialDefinition.push(<MaterialAttribute>{
-            type: MaterialAttributeType.Vec4,
+        attributeAccessors.push([tangents, () => vec4.create()]);
+        attributes.push(<MaterialAttribute>{
+            type: MaterialAttributeStandardType.Tangent,
+            valueType: MaterialAttributeValueType.Vec4,
             transformable: MaterialAttributeTransform.Model,
             flippable: false,
         });
@@ -52,10 +49,10 @@ export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, 
 
     const normals = mesh.attribute(WL.MeshAttribute.Normal);
     if (normals) {
-        vertexPropertyMap.set(attributes.length, WL.MeshAttribute.Normal);
-        attributes.push([normals, () => vec3.create()]);
-        materialDefinition.push(<MaterialAttribute>{
-            type: MaterialAttributeType.Vec3,
+        attributeAccessors.push([normals, () => vec3.create()]);
+        attributes.push(<MaterialAttribute>{
+            type: MaterialAttributeStandardType.Normal,
+            valueType: MaterialAttributeValueType.Vec3,
             transformable: MaterialAttributeTransform.Normal,
             flippable: true,
         });
@@ -63,10 +60,10 @@ export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, 
 
     const texCoords = mesh.attribute(WL.MeshAttribute.TextureCoordinate);
     if (texCoords) {
-        vertexPropertyMap.set(attributes.length, WL.MeshAttribute.TextureCoordinate);
-        attributes.push([texCoords, () => vec2.create()]);
-        materialDefinition.push(<MaterialAttribute>{
-            type: MaterialAttributeType.Vec2,
+        attributeAccessors.push([texCoords, () => vec2.create()]);
+        attributes.push(<MaterialAttribute>{
+            type: MaterialAttributeStandardType.TextureCoordinate,
+            valueType: MaterialAttributeValueType.Vec2,
             transformable: null,
             flippable: false,
         });
@@ -74,18 +71,17 @@ export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, 
 
     const colors = mesh.attribute(WL.MeshAttribute.Color);
     if (colors) {
-        vertexPropertyMap.set(attributes.length, WL.MeshAttribute.Color);
-        attributes.push([colors, () => vec4.create()]);
-        materialDefinition.push(<MaterialAttribute>{
-            type: MaterialAttributeType.Vec3,
+        attributeAccessors.push([colors, () => vec4.create()]);
+        attributes.push(<MaterialAttribute>{
+            type: MaterialAttributeStandardType.Color,
+            valueType: MaterialAttributeValueType.Vec3,
             transformable: null,
             flippable: false,
         });
     }
 
-    if (!attributes.length) {
-        attributes = null;
-        vertexPropertyMap = null;
+    if (!attributeAccessors.length) {
+        attributeAccessors = null;
     }
 
     // convert
@@ -93,21 +89,21 @@ export default function wleAddMeshToOctreeCSG(octree: OctreeCSG, mesh: WL.Mesh, 
         let a, b, c;
 
         if (indexData === null) {
-            a = makeVertex(i++, positions, attributes);
-            b = makeVertex(i++, positions, attributes);
-            c = makeVertex(i++, positions, attributes);
+            a = makeVertex(i++, positions, attributeAccessors);
+            b = makeVertex(i++, positions, attributeAccessors);
+            c = makeVertex(i++, positions, attributeAccessors);
         } else {
             const ia = indexData[i++];
             const ib = indexData[i++];
             const ic = indexData[i++];
-            a = makeVertex(ia, positions, attributes);
-            b = makeVertex(ib, positions, attributes);
-            c = makeVertex(ic, positions, attributes);
+            a = makeVertex(ia, positions, attributeAccessors);
+            b = makeVertex(ib, positions, attributeAccessors);
+            c = makeVertex(ic, positions, attributeAccessors);
         }
         const polygon = new Polygon([a, b, c], materialIndex);
         polygon.originalValid = true;
         octree.addPolygon(polygon);
     }
 
-    return [vertexPropertyMap, materialDefinition];
+    return attributes;
 }

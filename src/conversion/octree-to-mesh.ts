@@ -1,21 +1,20 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../../types/globals.d.ts" />
 
-import { OctreeCSG } from 'octreecsg-ea';
-import { MaterialMeshAttributeMap } from './MaterialMeshAttributeMap';
+import { MaterialAttributeStandardType } from 'octreecsg-ea';
 
-import type { Vertex } from 'octreecsg-ea';
+import type { OctreeCSG, Vertex, MaterialDefinitions } from 'octreecsg-ea';
 
 type AttributesMap = Map<number, WL.MeshAttributeAccessor>;
 
-function uploadVertex(vertex: Vertex, index: number, posAccessor: WL.MeshAttributeAccessor, attributes: AttributesMap) {
+function uploadVertex(vertex: Vertex, index: number, posAccessor: WL.MeshAttributeAccessor, wleAttributes: AttributesMap) {
     posAccessor.set(index, vertex.pos as number[]);
 
     if (vertex.extra) {
         const extraCount = vertex.extra.length;
 
         for (let i = 0; i < extraCount; i++) {
-            const accessor = attributes.get(i);
+            const accessor = wleAttributes.get(i);
             if (accessor) {
                 accessor.set(index, vertex.extra[i]);
             }
@@ -23,7 +22,7 @@ function uploadVertex(vertex: Vertex, index: number, posAccessor: WL.MeshAttribu
     }
 }
 
-export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialMap: Readonly<Map<number, [Readonly<MaterialMeshAttributeMap>, WL.Material]>>): Map<WL.Material, WL.Mesh> {
+export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialDefinitions: MaterialDefinitions, materialMap: Readonly<Map<number, WL.Material>>): Map<WL.Material, WL.Mesh> {
     // get polygons
     const polygons = octree.getPolygons();
 
@@ -33,7 +32,8 @@ export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialMap: Reado
         const materialID = poly.shared;
 
         if (!materialMap.has(materialID)) {
-            throw new Error(`Missing material ID (${materialID}) found in CSG. Make sure to include it in the material map. A fallback material can be specified with an undefined key`);
+            // ignore material if it's not present in the map
+            continue;
         }
 
         const count = polygonCounts.get(materialID) ?? 0;
@@ -63,49 +63,50 @@ export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialMap: Reado
 
         // make mesh from index buffer
         const mesh = new WL.Mesh({ vertexCount, indexType, indexData });
-        const [propMap, material] = materialMap.get(materialID) as [MaterialMeshAttributeMap, WL.Material];
+        const material = materialMap.get(materialID) as WL.Material;
         const position = mesh.attribute(WL.MeshAttribute.Position);
-        const attributes: AttributesMap = new Map();
+        const wleAttributes: AttributesMap = new Map();
+        const attributes = materialDefinitions.get(materialID);
 
-        if (propMap) {
-            for (const [extraIndex, attributeType] of propMap) {
+        if (attributes) {
+            for (const [extraIndex, attributeType] of attributes.entries()) {
                 // TODO joints
-                switch (attributeType) {
-                    case WL.MeshAttribute.Tangent:
+                switch (attributeType.type) {
+                    case MaterialAttributeStandardType.Tangent:
                     {
                         const tangents = mesh.attribute(WL.MeshAttribute.Tangent);
                         if (tangents) {
-                            attributes.set(extraIndex, tangents);
+                            wleAttributes.set(extraIndex, tangents);
                         } else {
                             console.warn(`Could not create tangent mesh attribute accessor. Vertex property ignored`);
                         }
                         break;
                     }
-                    case WL.MeshAttribute.Normal:
+                    case MaterialAttributeStandardType.Normal:
                     {
                         const normals = mesh.attribute(WL.MeshAttribute.Normal);
                         if (normals) {
-                            attributes.set(extraIndex, normals);
+                            wleAttributes.set(extraIndex, normals);
                         } else {
                             console.warn(`Could not create normal mesh attribute accessor. Vertex property ignored`);
                         }
                         break;
                     }
-                    case WL.MeshAttribute.TextureCoordinate:
+                    case MaterialAttributeStandardType.TextureCoordinate:
                     {
                         const texCoords = mesh.attribute(WL.MeshAttribute.TextureCoordinate);
                         if (texCoords) {
-                            attributes.set(extraIndex, texCoords);
+                            wleAttributes.set(extraIndex, texCoords);
                         } else {
                             console.warn(`Could not create texture coordinate mesh attribute accessor. Vertex property ignored`);
                         }
                         break;
                     }
-                    case WL.MeshAttribute.Color:
+                    case MaterialAttributeStandardType.Color:
                     {
                         const colors = mesh.attribute(WL.MeshAttribute.Color);
                         if (colors) {
-                            attributes.set(extraIndex, colors);
+                            wleAttributes.set(extraIndex, colors);
                         } else {
                             console.warn(`Could not create color mesh attribute accessor. Vertex property ignored`);
                         }
@@ -121,9 +122,9 @@ export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialMap: Reado
         let v = 0;
         for (const poly of polygons) {
             if (poly.shared === materialID) {
-                uploadVertex(poly.vertices[0], v++, position, attributes);
-                uploadVertex(poly.vertices[1], v++, position, attributes);
-                uploadVertex(poly.vertices[2], v++, position, attributes);
+                uploadVertex(poly.vertices[0], v++, position, wleAttributes);
+                uploadVertex(poly.vertices[1], v++, position, wleAttributes);
+                uploadVertex(poly.vertices[2], v++, position, wleAttributes);
             }
         }
 
