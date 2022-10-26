@@ -3,7 +3,7 @@
 
 import { MaterialAttributeStandardType } from 'octreecsg-ea';
 
-import type { OctreeCSG, Vertex, MaterialDefinitions } from 'octreecsg-ea';
+import type { OctreeCSG, Vertex } from 'octreecsg-ea';
 
 type AttributesMap = Map<number, WL.MeshAttributeAccessor>;
 
@@ -22,7 +22,7 @@ function uploadVertex(vertex: Vertex, index: number, posAccessor: WL.MeshAttribu
     }
 }
 
-export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialDefinitions: MaterialDefinitions, materialMap: Readonly<Map<number, WL.Material>>): Map<WL.Material, WL.Mesh> {
+export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialMap: Readonly<Map<number, WL.Material>>): Map<WL.Material, WL.Mesh> {
     // get polygons
     const polygons = octree.getPolygons();
 
@@ -66,7 +66,7 @@ export default function wleOctreeCSGToMesh(octree: OctreeCSG, materialDefinition
         const material = materialMap.get(materialID) as WL.Material;
         const position = mesh.attribute(WL.MeshAttribute.Position);
         const wleAttributes: AttributesMap = new Map();
-        const attributes = materialDefinitions.get(materialID);
+        const attributes = octree.materials.get(materialID);
 
         if (attributes) {
             for (const [extraIndex, attributeType] of attributes.entries()) {
